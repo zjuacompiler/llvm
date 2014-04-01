@@ -8,7 +8,7 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL := ../..
-TOOLNAME := llc
+TOOLNAME := llc-3.4
 LINK_COMPONENTS := all-targets bitreader asmparser irreader
 
 include $(LEVEL)/Makefile.common
