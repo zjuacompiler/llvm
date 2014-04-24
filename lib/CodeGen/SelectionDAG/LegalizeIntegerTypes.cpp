@@ -1113,8 +1113,8 @@ void DAGTypeLegalizer::ExpandIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::FP_TO_SINT:  ExpandIntRes_FP_TO_SINT(N, Lo, Hi); break;
   case ISD::FP_TO_UINT:  ExpandIntRes_FP_TO_UINT(N, Lo, Hi); break;
   case ISD::LOAD:        ExpandIntRes_LOAD(cast<LoadSDNode>(N), Lo, Hi); break;
-	case ISD::MUL:         ExpandIntRes_MUL(N, Lo, Hi); break;
-	case ISD::UMUL_LOHI:   ExpandIntRes_UMUL_LOHI(N, Lo, Hi); break;
+  case ISD::MUL:         ExpandIntRes_MUL(N, Lo, Hi); break;
+  case ISD::UMUL_LOHI:   ExpandIntRes_UMUL_LOHI(N, Lo, Hi); break;
   case ISD::SDIV:        ExpandIntRes_SDIV(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND: ExpandIntRes_SIGN_EXTEND(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND_INREG: ExpandIntRes_SIGN_EXTEND_INREG(N, Lo, Hi); break;
@@ -1992,22 +1992,22 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
     }
   }
 
-	if (VT.getSizeInBits() == 256) {
-		SDValue LL, LH, RL, RH;
-		GetExpandedInteger(N->getOperand(0), LL, LH);
-		GetExpandedInteger(N->getOperand(1), RL, RH);
+  if (VT.getSizeInBits() == 256) {
+    SDValue LL, LH, RL, RH;
+    GetExpandedInteger(N->getOperand(0), LL, LH);
+    GetExpandedInteger(N->getOperand(1), RL, RH);
 
-		// Lo,Hi = umul LHS, RHS.
-		SDValue UMulLOHI = DAG.getNode(ISD::UMUL_LOHI, dl,
-			DAG.getVTList(NVT, NVT), LL, RL);
-		Lo = UMulLOHI;
-		Hi = UMulLOHI.getValue(1);
-		RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
-		LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
-		Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
-		Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
-		return;
-	}
+    // Lo,Hi = umul LHS, RHS.
+    SDValue UMulLOHI = DAG.getNode(ISD::UMUL_LOHI, dl,
+                                   DAG.getVTList(NVT, NVT), LL, RL);
+    Lo = UMulLOHI;
+    Hi = UMulLOHI.getValue(1);
+    RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
+    LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
+    return;
+  }
 
   // If nothing else, we can make a libcall.
   RTLIB::Libcall LC = RTLIB::UNKNOWN_LIBCALL;
