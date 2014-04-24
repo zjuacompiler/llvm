@@ -1115,6 +1115,7 @@ void DAGTypeLegalizer::ExpandIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::LOAD:        ExpandIntRes_LOAD(cast<LoadSDNode>(N), Lo, Hi); break;
   case ISD::MUL:         ExpandIntRes_MUL(N, Lo, Hi); break;
   case ISD::UMUL_LOHI:   ExpandIntRes_UMUL_LOHI(N, Lo, Hi); break;
+  case ISD::SMUL_LOHI:   ExpandIntRes_SMUL_LOHI(N, Lo, Hi);break;
   case ISD::SDIV:        ExpandIntRes_SDIV(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND: ExpandIntRes_SIGN_EXTEND(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND_INREG: ExpandIntRes_SIGN_EXTEND_INREG(N, Lo, Hi); break;
@@ -1928,78 +1929,85 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
   bool HasMULHU = TLI.isOperationLegalOrCustom(ISD::MULHU, NVT);
   bool HasSMUL_LOHI = TLI.isOperationLegalOrCustom(ISD::SMUL_LOHI, NVT);
   bool HasUMUL_LOHI = TLI.isOperationLegalOrCustom(ISD::UMUL_LOHI, NVT);
-  if (HasMULHU || HasMULHS || HasUMUL_LOHI || HasSMUL_LOHI) {
-    SDValue LL, LH, RL, RH;
-    GetExpandedInteger(N->getOperand(0), LL, LH);
-    GetExpandedInteger(N->getOperand(1), RL, RH);
-    unsigned OuterBitSize = VT.getSizeInBits();
-    unsigned InnerBitSize = NVT.getSizeInBits();
-    unsigned LHSSB = DAG.ComputeNumSignBits(N->getOperand(0));
-    unsigned RHSSB = DAG.ComputeNumSignBits(N->getOperand(1));
 
-    APInt HighMask = APInt::getHighBitsSet(OuterBitSize, InnerBitSize);
-    if (DAG.MaskedValueIsZero(N->getOperand(0), HighMask) &&
-        DAG.MaskedValueIsZero(N->getOperand(1), HighMask)) {
-      // The inputs are both zero-extended.
-      if (HasUMUL_LOHI) {
-        // We can emit a umul_lohi.
-        Lo = DAG.getNode(ISD::UMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
-        Hi = SDValue(Lo.getNode(), 1);
-        return;
-      }
-      if (HasMULHU) {
-        // We can emit a mulhu+mul.
-        Lo = DAG.getNode(ISD::MUL, dl, NVT, LL, RL);
-        Hi = DAG.getNode(ISD::MULHU, dl, NVT, LL, RL);
-        return;
-      }
-    }
-    if (LHSSB > InnerBitSize && RHSSB > InnerBitSize) {
-      // The input values are both sign-extended.
-      if (HasSMUL_LOHI) {
-        // We can emit a smul_lohi.
-        Lo = DAG.getNode(ISD::SMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
-        Hi = SDValue(Lo.getNode(), 1);
-        return;
-      }
-      if (HasMULHS) {
-        // We can emit a mulhs+mul.
-        Lo = DAG.getNode(ISD::MUL, dl, NVT, LL, RL);
-        Hi = DAG.getNode(ISD::MULHS, dl, NVT, LL, RL);
-        return;
-      }
-    }
+  SDValue LL, LH, RL, RH;
+  GetExpandedInteger(N->getOperand(0), LL, LH);
+  GetExpandedInteger(N->getOperand(1), RL, RH);
+  unsigned OuterBitSize = VT.getSizeInBits();
+  unsigned InnerBitSize = NVT.getSizeInBits();
+  unsigned LHSSB = DAG.ComputeNumSignBits(N->getOperand(0));
+  unsigned RHSSB = DAG.ComputeNumSignBits(N->getOperand(1));
+
+  APInt HighMask = APInt::getHighBitsSet(OuterBitSize, InnerBitSize);
+  if (DAG.MaskedValueIsZero(N->getOperand(0), HighMask) &&
+      DAG.MaskedValueIsZero(N->getOperand(1), HighMask)) {
+    // The inputs are both zero-extended.
     if (HasUMUL_LOHI) {
-      // Lo,Hi = umul LHS, RHS.
-      SDValue UMulLOHI = DAG.getNode(ISD::UMUL_LOHI, dl,
-                                       DAG.getVTList(NVT, NVT), LL, RL);
-      Lo = UMulLOHI;
-      Hi = UMulLOHI.getValue(1);
-      RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
-      LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
-      Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
-      Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
+      // We can emit a umul_lohi.
+      Lo = DAG.getNode(ISD::UMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
+      Hi = SDValue(Lo.getNode(), 1);
       return;
     }
     if (HasMULHU) {
+      // We can emit a mulhu+mul.
       Lo = DAG.getNode(ISD::MUL, dl, NVT, LL, RL);
       Hi = DAG.getNode(ISD::MULHU, dl, NVT, LL, RL);
-      RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
-      LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
-      Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
-      Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
       return;
     }
+  else
+  {
+    // Use UMUL_LOHI expansion
+    Lo = DAG.getNode(ISD::UMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
+    Hi = SDValue(Lo.getNode(), 1);
+    return;
   }
-
-  if (VT.getSizeInBits() == 256) {
-    SDValue LL, LH, RL, RH;
-    GetExpandedInteger(N->getOperand(0), LL, LH);
-    GetExpandedInteger(N->getOperand(1), RL, RH);
-
+}
+  if (LHSSB > InnerBitSize && RHSSB > InnerBitSize) {
+    // The input values are both sign-extended.
+    if (HasSMUL_LOHI) {
+      // We can emit a smul_lohi.
+      Lo = DAG.getNode(ISD::SMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
+      Hi = SDValue(Lo.getNode(), 1);
+      return;
+    }
+    if (HasMULHS) {
+      // We can emit a mulhs+mul.
+      Lo = DAG.getNode(ISD::MUL, dl, NVT, LL, RL);
+      Hi = DAG.getNode(ISD::MULHS, dl, NVT, LL, RL);
+      return;
+    }
+	  else
+	  {
+		// Use SMUL_LOHI expansion
+		Lo = DAG.getNode(ISD::SMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
+        Hi = SDValue(Lo.getNode(), 1);
+	  }
+  }
+  if (HasUMUL_LOHI) {
     // Lo,Hi = umul LHS, RHS.
     SDValue UMulLOHI = DAG.getNode(ISD::UMUL_LOHI, dl,
-                                   DAG.getVTList(NVT, NVT), LL, RL);
+                                      DAG.getVTList(NVT, NVT), LL, RL);
+    Lo = UMulLOHI;
+    Hi = UMulLOHI.getValue(1);
+    RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
+    LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
+    return;
+  }
+  if (HasMULHU) {
+    Lo = DAG.getNode(ISD::MUL, dl, NVT, LL, RL);
+    Hi = DAG.getNode(ISD::MULHU, dl, NVT, LL, RL);
+    RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
+    LH = DAG.getNode(ISD::MUL, dl, NVT, LH, RL);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, RH);
+    Hi = DAG.getNode(ISD::ADD, dl, NVT, Hi, LH);
+    return;
+  }
+  else {      
+	  // Lo,Hi = umul LHS, RHS. Use UMUL_LOHI expansion.
+    SDValue UMulLOHI = DAG.getNode(ISD::UMUL_LOHI, dl,
+                                      DAG.getVTList(NVT, NVT), LL, RL);
     Lo = UMulLOHI;
     Hi = UMulLOHI.getValue(1);
     RH = DAG.getNode(ISD::MUL, dl, NVT, LL, RH);
@@ -2084,6 +2092,16 @@ void DAGTypeLegalizer::ExpandIntRes_UMUL_LOHI(SDNode *N,
 
 	// Replace the second value of node N
 	ReplaceValueWith(SDValue(N, 1), JoinIntegers(HL, HH));
+}
+
+void DAGTypeLegalizer::ExpandIntRes_SMUL_LOHI(SDNode *N,
+	SDValue &Lo, SDValue &Hi) {
+	EVT VT = N->getValueType(0);
+	SDLoc dl(N);
+	if(!DAG.SignBitIsZero(N->getOperand(0)))
+		Hi = DAG.getNode(ISD::SUB, dl, VT, Hi, N->getOperand(1));
+	if(!DAG.SignBitIsZero(N->getOperand(1)))
+		Hi = DAG.getNode(ISD::SUB, dl, VT, Hi, N->getOperand(0));
 }
 
 void DAGTypeLegalizer::ExpandIntRes_SADDSUBO(SDNode *Node,
