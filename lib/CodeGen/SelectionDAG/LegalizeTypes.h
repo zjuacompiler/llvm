@@ -327,6 +327,7 @@ private:
   void ExpandIntRes_ADDSUBE           (SDNode *N, SDValue &Lo, SDValue &Hi);
   void ExpandIntRes_BSWAP             (SDNode *N, SDValue &Lo, SDValue &Hi);
   void ExpandIntRes_MUL               (SDNode *N, SDValue &Lo, SDValue &Hi);
+  void ExpandIntRes_UMUL_LOHI         (SDNode *N, SDValue &Lo, SDValue &Hi);
   void ExpandIntRes_SDIV              (SDNode *N, SDValue &Lo, SDValue &Hi);
   void ExpandIntRes_SREM              (SDNode *N, SDValue &Lo, SDValue &Hi);
   void ExpandIntRes_UDIV              (SDNode *N, SDValue &Lo, SDValue &Hi);
