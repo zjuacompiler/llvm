@@ -1918,6 +1918,30 @@ void DAGTypeLegalizer::ExpandIntRes_Logical(SDNode *N,
   Hi = DAG.getNode(N->getOpcode(), dl, LL.getValueType(), LH, RH);
 }
 
+// return true if can implement UMUL_LOHI for VT recursively
+// for example, if UMUL_LOHI is supported for i64 on this target,
+// then i256 can be implemented by path i256 -> i128 -> i64
+static bool HasUMUL_LOHI_Re(const TargetLowering& TLI,
+                            LLVMContext &Context, EVT VT) {
+  EVT NVT = TLI.getTypeToTransformTo(Context, VT);
+
+  // if has UMUL_LOHI for NVT, return false
+  bool HasUMUL_LOHI = TLI.isOperationLegalOrCustom(ISD::UMUL_LOHI, NVT);
+  if (HasUMUL_LOHI) {
+    return true;
+  }
+
+  // if NVT is 16 bits long, if can't be splitted
+  // so return false
+  if (NVT.getSizeInBits() == 16) {
+    return false;
+  }
+
+  // if NVT can be splitted,
+  // recursively call this function to determine NVT
+  return HasUMUL_LOHI_Re(TLI, Context, NVT);
+}
+
 void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
                                         SDValue &Lo, SDValue &Hi) {
   EVT VT = N->getValueType(0);
@@ -1992,7 +2016,7 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
     }
   }
 
-  if (VT.getSizeInBits() == 256) {
+  if (HasUMUL_LOHI_Re(TLI, *DAG.getContext(), VT)) {
     SDValue LL, LH, RL, RH;
     GetExpandedInteger(N->getOperand(0), LL, LH);
     GetExpandedInteger(N->getOperand(1), RL, RH);
@@ -2028,62 +2052,62 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
 }
 
 void DAGTypeLegalizer::ExpandIntRes_UMUL_LOHI(SDNode *N,
-	SDValue &Lo, SDValue &Hi) {
-	EVT VT = N->getValueType(0);
-	EVT NVT = TLI.getTypeToTransformTo(*DAG.getContext(), VT);
-	SDLoc dl(N);
+                                              SDValue &Lo, SDValue &Hi) {
+  EVT VT = N->getValueType(0);
+  EVT NVT = TLI.getTypeToTransformTo(*DAG.getContext(), VT);
+  SDLoc dl(N);
 
-	SDValue LLO, LHO, RLO, RHO;
-	GetExpandedInteger(N->getOperand(0), LLO, LHO);
-	GetExpandedInteger(N->getOperand(1), RLO, RHO);
+  SDValue LLO, LHO, RLO, RHO;
+  GetExpandedInteger(N->getOperand(0), LLO, LHO);
+  GetExpandedInteger(N->getOperand(1), RLO, RHO);
 
-	SDValue RH_LH = DAG.getNode(ISD::UMUL_LOHI, dl,
-		DAG.getVTList(NVT, NVT), RHO, LHO);
-	SDValue RL_LH = DAG.getNode(ISD::UMUL_LOHI, dl,
-		DAG.getVTList(NVT, NVT), RLO, LHO);
-	SDValue RH_LL = DAG.getNode(ISD::UMUL_LOHI, dl,
-		DAG.getVTList(NVT, NVT), RHO, LLO);
-	SDValue RL_LL = DAG.getNode(ISD::UMUL_LOHI, dl,
-		DAG.getVTList(NVT, NVT), RLO, LLO);
+  SDValue RH_LH = DAG.getNode(ISD::UMUL_LOHI, dl,
+                              DAG.getVTList(NVT, NVT), RHO, LHO);
+  SDValue RL_LH = DAG.getNode(ISD::UMUL_LOHI, dl,
+                              DAG.getVTList(NVT, NVT), RLO, LHO);
+  SDValue RH_LL = DAG.getNode(ISD::UMUL_LOHI, dl,
+                              DAG.getVTList(NVT, NVT), RHO, LLO);
+  SDValue RL_LL = DAG.getNode(ISD::UMUL_LOHI, dl,
+                              DAG.getVTList(NVT, NVT), RLO, LLO);
 
-	// first calculate the lower part of the lower part
-	SDValue LL = RL_LL.getValue(0);
+  // first calculate the lower part of the lower part
+  SDValue LL = RL_LL.getValue(0);
 
-	// calculate the higher part of the lower part
-	// lh = rl_ll_h + rh_ll_l + rl_lh_l
-	SDValue LH, LH_C; // LH_C is the carry part of the result
-	// zero extend the three operands
-	SDValue RL_LL_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LL.getValue(1));
-	SDValue RH_LL_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LL.getValue(0));
-	SDValue RL_LH_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LH.getValue(0));
-	// add them together
-	SDValue LH_Result = DAG.getNode(ISD::ADD, dl, VT, RL_LL_H, RH_LL_L);
-	LH_Result = DAG.getNode(ISD::ADD, dl, VT, LH_Result, RL_LH_L);
-	// split the result
-	SplitInteger(LH_Result, LH, LH_C);
+  // calculate the higher part of the lower part
+  // lh = rl_ll_h + rh_ll_l + rl_lh_l
+  SDValue LH, LH_C; // LH_C is the carry part of the result
+  // zero extend the three operands
+  SDValue RL_LL_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LL.getValue(1));
+  SDValue RH_LL_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LL.getValue(0));
+  SDValue RL_LH_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LH.getValue(0));
+  // add them together
+  SDValue LH_Result = DAG.getNode(ISD::ADD, dl, VT, RL_LL_H, RH_LL_L);
+  LH_Result = DAG.getNode(ISD::ADD, dl, VT, LH_Result, RL_LH_L);
+  // split the result
+  SplitInteger(LH_Result, LH, LH_C);
 
-	// Replace the second value of node N
-	ReplaceValueWith(SDValue(N, 0), JoinIntegers(LL, LH));
+  // Replace the second value of node N
+  ReplaceValueWith(SDValue(N, 0), JoinIntegers(LL, LH));
 
-	// calculate the lower part of the higher part
-	SDValue HL, HL_C; // HL_C is the carry part of the result
-	// zero extend the four operands
-	SDValue RH_LH_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LH.getValue(0));
-	SDValue RH_LL_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LL.getValue(1));
-	SDValue RL_LH_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LH.getValue(1));
-	LH_C = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, LH_C);
-	// add them together
-	SDValue HL_Result = DAG.getNode(ISD::ADD, dl, VT, RH_LH_L, RH_LL_H);
-	HL_Result = DAG.getNode(ISD::ADD, dl, VT, HL_Result, RL_LH_H);
-	HL_Result = DAG.getNode(ISD::ADD, dl, VT, HL_Result, LH_C);
-	// split the result
-	SplitInteger(HL_Result, HL, HL_C);
+  // calculate the lower part of the higher part
+  SDValue HL, HL_C; // HL_C is the carry part of the result
+  // zero extend the four operands
+  SDValue RH_LH_L = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LH.getValue(0));
+  SDValue RH_LL_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RH_LL.getValue(1));
+  SDValue RL_LH_H = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, RL_LH.getValue(1));
+  LH_C = DAG.getNode(ISD::ZERO_EXTEND, dl, VT, LH_C);
+  // add them together
+  SDValue HL_Result = DAG.getNode(ISD::ADD, dl, VT, RH_LH_L, RH_LL_H);
+  HL_Result = DAG.getNode(ISD::ADD, dl, VT, HL_Result, RL_LH_H);
+  HL_Result = DAG.getNode(ISD::ADD, dl, VT, HL_Result, LH_C);
+  // split the result
+  SplitInteger(HL_Result, HL, HL_C);
 
-	// calculate the higher part of the higher part
-	SDValue HH = DAG.getNode(ISD::ADD, dl, NVT, RH_LH.getValue(1), HL_C);
+  // calculate the higher part of the higher part
+  SDValue HH = DAG.getNode(ISD::ADD, dl, NVT, RH_LH.getValue(1), HL_C);
 
-	// Replace the second value of node N
-	ReplaceValueWith(SDValue(N, 1), JoinIntegers(HL, HH));
+  // Replace the second value of node N
+  ReplaceValueWith(SDValue(N, 1), JoinIntegers(HL, HH));
 }
 
 void DAGTypeLegalizer::ExpandIntRes_SADDSUBO(SDNode *Node,
