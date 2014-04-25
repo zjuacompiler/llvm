@@ -1115,7 +1115,6 @@ void DAGTypeLegalizer::ExpandIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::LOAD:        ExpandIntRes_LOAD(cast<LoadSDNode>(N), Lo, Hi); break;
   case ISD::MUL:         ExpandIntRes_MUL(N, Lo, Hi); break;
   case ISD::UMUL_LOHI:   ExpandIntRes_UMUL_LOHI(N, Lo, Hi); break;
-  case ISD::SMUL_LOHI:   ExpandIntRes_SMUL_LOHI(N, Lo, Hi);break;
   case ISD::SDIV:        ExpandIntRes_SDIV(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND: ExpandIntRes_SIGN_EXTEND(N, Lo, Hi); break;
   case ISD::SIGN_EXTEND_INREG: ExpandIntRes_SIGN_EXTEND_INREG(N, Lo, Hi); break;
@@ -1954,13 +1953,13 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
       Hi = DAG.getNode(ISD::MULHU, dl, NVT, LL, RL);
       return;
     }
-  else
-  {
-    // Use UMUL_LOHI expansion
-    Lo = DAG.getNode(ISD::UMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
-    Hi = SDValue(Lo.getNode(), 1);
-    return;
-  }
+    else
+    {
+      // Use UMUL_LOHI expansion
+      Lo = DAG.getNode(ISD::UMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
+      Hi = SDValue(Lo.getNode(), 1);
+      return;
+    }
 }
   if (LHSSB > InnerBitSize && RHSSB > InnerBitSize) {
     // The input values are both sign-extended.
@@ -1976,12 +1975,6 @@ void DAGTypeLegalizer::ExpandIntRes_MUL(SDNode *N,
       Hi = DAG.getNode(ISD::MULHS, dl, NVT, LL, RL);
       return;
     }
-	  else
-	  {
-		// Use SMUL_LOHI expansion
-		Lo = DAG.getNode(ISD::SMUL_LOHI, dl, DAG.getVTList(NVT, NVT), LL, RL);
-        Hi = SDValue(Lo.getNode(), 1);
-	  }
   }
   if (HasUMUL_LOHI) {
     // Lo,Hi = umul LHS, RHS.
@@ -2092,16 +2085,6 @@ void DAGTypeLegalizer::ExpandIntRes_UMUL_LOHI(SDNode *N,
 
 	// Replace the second value of node N
 	ReplaceValueWith(SDValue(N, 1), JoinIntegers(HL, HH));
-}
-
-void DAGTypeLegalizer::ExpandIntRes_SMUL_LOHI(SDNode *N,
-	SDValue &Lo, SDValue &Hi) {
-	EVT VT = N->getValueType(0);
-	SDLoc dl(N);
-	if(!DAG.SignBitIsZero(N->getOperand(0)))
-		Hi = DAG.getNode(ISD::SUB, dl, VT, Hi, N->getOperand(1));
-	if(!DAG.SignBitIsZero(N->getOperand(1)))
-		Hi = DAG.getNode(ISD::SUB, dl, VT, Hi, N->getOperand(0));
 }
 
 void DAGTypeLegalizer::ExpandIntRes_SADDSUBO(SDNode *Node,
