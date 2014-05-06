@@ -256,32 +256,6 @@ SDValue DAGTypeLegalizer::PromoteIntRes_BITCAST(SDNode *N) {
       return DAG.getNode(ISD::BITCAST, dl, NOutVT, GetWidenedVector(InOp));
   }
 
-  // If vector scalar type is smaller than i8, we cannot use store and load
-  // to implement bitcast directly, first cast the input to integer type,
-  // then use store and load.
-  if (InVT.isVector() && InVT.getScalarType().getSizeInBits() < 8) {
-    EVT InSclType = InVT.getScalarType();
-    unsigned ScalarSize = InSclType.getSizeInBits();
-    unsigned ElemNum = InVT.getVectorNumElements();
-    EVT ResultType = EVT::getIntegerVT(*DAG.getContext(), InVT.getSizeInBits());
-    EVT IntegerType = TLI.getVectorIdxTy();
-    SDValue Result = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl,
-                                 InSclType, InOp, DAG.getConstant(0, IntegerType));
-    Result = DAG.getNode(ISD::ZERO_EXTEND, dl, ResultType, Result);
-
-    for (unsigned Idx = 1; Idx < ElemNum; ++Idx) {
-      SDValue IdxNode = DAG.getConstant(Idx, IntegerType);
-      SDValue BitsToShift = DAG.getConstant(Idx*ScalarSize, IntegerType);
-      SDValue Element = DAG.getNode(ISD::ZERO_EXTEND, dl, ResultType,
-                                    DAG.getNode(ISD::EXTRACT_VECTOR_ELT,
-                                                dl, InSclType, InOp, IdxNode));
-      Result = DAG.getNode(ISD::OR, dl, ResultType, Result,
-                           DAG.getNode(ISD::SHL, dl, ResultType, Element, BitsToShift));
-    }
-
-    InOp = Result;
-  }
-
   return DAG.getNode(ISD::ANY_EXTEND, dl, NOutVT,
                      CreateStackStoreLoad(InOp, OutVT));
 }
@@ -895,6 +869,7 @@ SDValue DAGTypeLegalizer::PromoteIntOp_ATOMIC_STORE(AtomicSDNode *N) {
 SDValue DAGTypeLegalizer::PromoteIntOp_BITCAST(SDNode *N) {
   // This should only occur in unusual situations like bitcasting to an
   // x86_fp80, so just turn it into a store+load
+
   return CreateStackStoreLoad(N->getOperand(0), N->getValueType(0));
 }
 

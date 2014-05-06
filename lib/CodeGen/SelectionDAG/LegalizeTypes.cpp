@@ -882,8 +882,41 @@ SDValue DAGTypeLegalizer::BitConvertVectorToIntegerVector(SDValue Op) {
                      EVT::getVectorVT(*DAG.getContext(), EltNVT, NumElts), Op);
 }
 
+// Using SHIFT and OR to cast small vector to integer
+SDValue DAGTypeLegalizer::CreateShiftOr(SDValue InOp) {
+  EVT InVT = InOp.getValueType();
+  SDLoc dl(InOp);
+  EVT InSclType = InVT.getScalarType();
+  unsigned ScalarSize = InSclType.getSizeInBits();
+  unsigned ElemNum = InVT.getVectorNumElements();
+  EVT ResultType = EVT::getIntegerVT(*DAG.getContext(), InVT.getSizeInBits());
+  EVT IntegerType = TLI.getVectorIdxTy();
+  SDValue Result = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl,
+                               InSclType, InOp, DAG.getConstant(0, IntegerType));
+  Result = DAG.getNode(ISD::ZERO_EXTEND, dl, ResultType, Result);
+
+  for (unsigned Idx = 1; Idx < ElemNum; ++Idx) {
+    SDValue IdxNode = DAG.getConstant(Idx, IntegerType);
+    SDValue BitsToShift = DAG.getConstant(Idx*ScalarSize, IntegerType);
+    SDValue Element = DAG.getNode(ISD::ZERO_EXTEND, dl, ResultType,
+                                  DAG.getNode(ISD::EXTRACT_VECTOR_ELT,
+                                              dl, InSclType, InOp, IdxNode));
+    Result = DAG.getNode(ISD::OR, dl, ResultType, Result,
+                         DAG.getNode(ISD::SHL, dl, ResultType, Element, BitsToShift));
+  }
+  return Result;
+}
+
 SDValue DAGTypeLegalizer::CreateStackStoreLoad(SDValue Op,
                                                EVT DestVT) {
+  // If vector scalar type is smaller than i8, we cannot use store and load
+  // to implement bitcast directly, first cast the input to integer type,
+  // then use store and load.
+  EVT InVT = Op.getValueType();
+  if (InVT.isVector() && InVT.getScalarType().getSizeInBits() < 8) {
+    Op = CreateShiftOr(Op);
+  }
+
   SDLoc dl(Op);
   // Create the stack frame object.  Make sure it is aligned for both
   // the source and destination types.
