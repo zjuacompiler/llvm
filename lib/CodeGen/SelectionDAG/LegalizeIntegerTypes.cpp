@@ -259,9 +259,9 @@ SDValue DAGTypeLegalizer::PromoteIntRes_BITCAST(SDNode *N) {
   // If vector scalar type is smaller than i8, we cannot use store and load
   // to implement bitcast directly, first cast the input to integer type,
   // then use store and load.
-  EVT InSclType = InVT.getScalarType();
-  unsigned ScalarSize = InSclType.getSizeInBits();
-  if (ScalarSize < 8) {
+  if (InVT.isVector() && InVT.getScalarType().getSizeInBits() < 8) {
+    EVT InSclType = InVT.getScalarType();
+    unsigned ScalarSize = InSclType.getSizeInBits();
     unsigned ElemNum = InVT.getVectorNumElements();
     EVT ResultType = EVT::getIntegerVT(*DAG.getContext(), InVT.getSizeInBits());
     EVT IntegerType = TLI.getVectorIdxTy();
