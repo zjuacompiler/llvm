@@ -914,6 +914,8 @@ void X86TargetLowering::resetOperationActions() {
   setOperationAction(ISD::BITCAST,            MVT::v2i32, Expand);
   setOperationAction(ISD::BITCAST,            MVT::v1i64, Expand);
 
+  setOperationAction(ISD::BITCAST,            MVT::v32i1, Legal);
+
   if (!TM.Options.UseSoftFloat && Subtarget->hasSSE1()) {
     addRegisterClass(MVT::v4f32, &X86::VR128RegClass);
 
@@ -3809,7 +3811,25 @@ static bool isMOVHLPSMask(ArrayRef<int> Mask, MVT VT) {
 /// specifies a shuffle of elements that is suitable for input to PEXT in haswell architecture.
 static bool isPEXTMask(ArrayRef<int> Mask, MVT VT, SDValue V1, SDValue V2) {
 
-    return false;
+    dbgs() << "In isPEXTMask.\n";
+    for (unsigned i = 0; i < Mask.size(); ++i) {
+        dbgs() << Mask[i] << ".\n";
+    }
+    if (VT != MVT::v32i1)
+        return false;
+    if (ConstantSDNode *CN = dyn_cast<ConstantSDNode>(
+            V2.getOperand(0))) {
+        if (!CN->isNullValue())
+            //If elements in V2 are not Zero
+            return false;
+    }
+
+    //FIXME:Change the check
+    if (Mask[Mask.size() - 1] != 31) {
+        return false;
+    }
+
+    return true;
 }
 
 /// isMOVHLPS_v_undef_Mask - Special case of isMOVHLPSMask for canonical form
@@ -4818,6 +4838,35 @@ static SDValue getMOVL(SelectionDAG &DAG, SDLoc dl, EVT VT, SDValue V1,
   for (unsigned i = 1; i != NumElems; ++i)
     Mask.push_back(i);
   return DAG.getVectorShuffle(VT, dl, V1, V2, &Mask[0]);
+}
+
+/// getPEXT - Returns a PEXT node for an pext operation.
+static SDValue getPEXT(SelectionDAG &DAG, SDLoc dl, EVT VT, SDValue V1,
+                       SDValue V2, ArrayRef<int> Mask) {
+    //TODO: We can use bitcast to support the wider vector types
+    if (VT == MVT::v32i1) {
+
+        unsigned NumElts = Mask.size();
+        unsigned IntMask = 0;
+        for (unsigned i = 0; i < NumElts; ++i) {
+            if (Mask[i] < 32) {
+                IntMask |= 0x1 << Mask[i];
+            }
+        }
+
+        SDValue V = DAG.getNode(ISD::INTRINSIC_WO_CHAIN, dl,
+            MVT::i32,
+            DAG.getConstant(Intrinsic::x86_bmi_pext_32, MVT::i32),
+            //Operand 1,
+            DAG.getNode(ISD::BITCAST, dl, MVT::i32, V1),
+            //Operand 2,
+            DAG.getConstant(IntMask, MVT::i32));
+        V.dumpr();
+        return V;
+    }
+
+    return SDValue();
+
 }
 
 /// getUnpackl - Returns a vector_shuffle node for an unpackl operation.
@@ -7466,8 +7515,10 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
       dbgs() << "v2 is All Zeros.\n";
   }
 
+
   if (V2IsSplat && isPEXTMask(M, VT, V1, V2)) {
-      //return getPEXT(DAG, dl, VT, V1, V2);
+      dbgs() << "In PEXT Check.\n";
+      return getPEXT(DAG, dl, VT, V1, V2, M);
   }
 
 
