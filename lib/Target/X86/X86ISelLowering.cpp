@@ -287,6 +287,10 @@ void X86TargetLowering::resetOperationActions() {
   addRegisterClass(MVT::i8, &X86::GR8RegClass);
   addRegisterClass(MVT::i16, &X86::GR16RegClass);
   addRegisterClass(MVT::i32, &X86::GR32RegClass);
+
+  //My Edition
+  addRegisterClass(MVT::v32i1, &X86::GR32RegClass);
+
   if (Subtarget->is64Bit())
     addRegisterClass(MVT::i64, &X86::GR64RegClass);
 
@@ -2226,6 +2230,9 @@ X86TargetLowering::LowerFormalArguments(SDValue Chain,
         RC = &X86::VK8RegClass;
       else if (RegVT == MVT::v16i1)
         RC = &X86::VK16RegClass;
+      //My Edition
+      else if (RegVT == MVT::v32i1)
+          RC = &X86::GR32RegClass;
       else
         llvm_unreachable("Unknown argument type!");
 
