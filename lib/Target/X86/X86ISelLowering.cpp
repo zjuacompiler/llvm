@@ -289,7 +289,7 @@ void X86TargetLowering::resetOperationActions() {
   addRegisterClass(MVT::i32, &X86::GR32RegClass);
 
   //My Edition
-  addRegisterClass(MVT::v32i1, &X86::GR32RegClass);
+  addRegisterClass(MVT::v32i1, &X86::VR32RegClass);
 
   if (Subtarget->is64Bit())
     addRegisterClass(MVT::i64, &X86::GR64RegClass);
