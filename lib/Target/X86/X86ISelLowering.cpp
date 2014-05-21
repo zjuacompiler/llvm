@@ -2234,9 +2234,10 @@ X86TargetLowering::LowerFormalArguments(SDValue Chain,
         RC = &X86::VK8RegClass;
       else if (RegVT == MVT::v16i1)
         RC = &X86::VK16RegClass;
-      //My Edition
+
+      //Add to make v32i1 as argument available
       else if (RegVT == MVT::v32i1)
-          RC = &X86::GR32RegClass;
+          RC = &X86::VR32RegClass;
       else
         llvm_unreachable("Unknown argument type!");
 
@@ -3643,8 +3644,7 @@ static bool isPALIGNRMask(ArrayRef<int> Mask, MVT VT,
   if ((VT.is128BitVector() && !Subtarget->hasSSSE3()) ||
       (VT.is256BitVector() && !Subtarget->hasInt256()))
     return false;
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
-    //Return false when VT's Bit Size is less than 128
+  //Return false when VT's Bit Size is less than 128
   if (VT.getSizeInBits() < 128)
     return false;
 
@@ -7328,7 +7328,6 @@ NormalizeVectorShuffle(SDValue Op, const X86Subtarget *Subtarget,
 
 SDValue
 X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
-    dbgs() << "In LowerVector_SHUFFLE.\n";
   ShuffleVectorSDNode *SVOp = cast<ShuffleVectorSDNode>(Op);
   SDValue V1 = Op.getOperand(0);
   SDValue V2 = Op.getOperand(1);
@@ -7352,7 +7351,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
     return DAG.getUNDEF(VT);
 
   assert(!V1IsUndef && "Op 1 of shuffle should not be undef");
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
 
   // Vector shuffle lowering takes 3 steps:
   //
@@ -7377,7 +7375,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
 
   SmallVector<int, 8> M(SVOp->getMask().begin(), SVOp->getMask().end());
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   // NOTE: isPSHUFDMask can also match both masks below (unpckl_undef and
   // unpckh_undef). Only use pshufd if speed is more important than size.
   if (OptForSize && isUNPCKL_v_undef_Mask(M, VT, HasInt256))
@@ -7391,7 +7388,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
 
   if (isMOVHLPS_v_undef_Mask(M, VT))
     return getMOVHighToLow(Op, dl, DAG);
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
 
   // Use to match splats
     //Chang the order because the isUNPCKHMask will raise error when
@@ -7400,7 +7396,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
       HasSSE2 && isUNPCKHMask(M, VT, HasInt256) && V2IsUndef)
     return getTargetShuffleNode(X86ISD::UNPCKH, dl, VT, V1, V1, DAG);
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   if (isPSHUFDMask(M, VT)) {
     // The actual implementation will match the mask in the if above and then
     // during isel it can match several different instructions, not only pshufd
@@ -7421,13 +7416,11 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
                                 TargetMask, DAG);
   }
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   if (isPALIGNRMask(M, VT, Subtarget))
     return getTargetShuffleNode(X86ISD::PALIGNR, dl, VT, V1, V2,
                                 getShufflePALIGNRImmediate(SVOp),
                                 DAG);
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   // Check if this can be converted into a logical shift.
   bool isLeft = false;
   unsigned ShAmt = 0;
@@ -7441,7 +7434,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
     return getVShift(isLeft, VT, ShVal, ShAmt, DAG, *this, dl);
   }
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   if (isMOVLMask(M, VT)) {
     if (ISD::isBuildVectorAllZeros(V1.getNode()))
       return getVZextMovL(VT, VT, V2, DAG, Subtarget, dl);
@@ -7457,7 +7449,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
   // FIXME: fold these into legal mask.
   if (isMOVLHPSMask(M, VT) && !isUNPCKLMask(M, VT, HasInt256))
     return getMOVLowToHigh(Op, dl, DAG, HasSSE2);
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
 
   if (isMOVHLPSMask(M, VT))
     return getMOVHighToLow(Op, dl, DAG);
@@ -7467,7 +7458,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
 
   if (V2IsUndef && isMOVSLDUPMask(M, VT, Subtarget))
     return getTargetShuffleNode(X86ISD::MOVSLDUP, dl, VT, V1, DAG);
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
 
   if (isMOVLPMask(M, VT))
     return getMOVLP(Op, dl, DAG, HasSSE2);
@@ -7483,7 +7473,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
     return getVShift(isLeft, VT, ShVal, ShAmt, DAG, *this, dl);
   }
 
-    dbgs() << __FILE__ << " " << __LINE__ << ".\n";
   bool Commuted = false;
   // FIXME: This should also accept a bitcast of a splat?  Be careful, not
   // 1,1,1,1 -> v8i16 though.
@@ -7671,7 +7660,6 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
   // Handle general 256-bit shuffles
   if (VT.is256BitVector())
     return LowerVECTOR_SHUFFLE_256(SVOp, DAG);
-  dbgs() << "Gets end of LowerVECTOR_SHUFFLE.\n";
 
   return SDValue();
 }

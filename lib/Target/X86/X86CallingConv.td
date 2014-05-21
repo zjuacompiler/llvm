@@ -37,7 +37,6 @@ def RetCC_X86Common : CallingConv<[
   CCIfType<[i32], CCAssignToReg<[EAX, EDX, ECX]>>,
   CCIfType<[i64], CCAssignToReg<[RAX, RDX, RCX]>>,
 
-  //My Edition
   //Vector type v32i1 is stored in GR32Reg.
   CCIfType<[v32i1], CCAssignToReg<[EAX, EDX, ECX]>>,
   
@@ -235,7 +234,6 @@ def CC_X86_64_C : CallingConv<[
   CCIfType<[i32], CCAssignToReg<[EDI, ESI, EDX, ECX, R8D, R9D]>>,
   CCIfType<[i64], CCAssignToReg<[RDI, RSI, RDX, RCX, R8 , R9 ]>>,
 
-  //My Edition
   //Vector type v32i1 is stored in GR32Reg. 
   CCIfType<[v32i1], CCAssignToReg<[EDI, ESI, EDX, ECX, R8D, R9D]>>,
 

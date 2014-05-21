@@ -225,8 +225,6 @@ bool EEVT::TypeSet::MergeInTypeInfo(const EEVT::TypeSet &InVT, TreePattern &TP){
   // If we removed all of our types, we have a type contradiction.
   if (!TypeVec.empty())
     return MadeChange;
-    //My Edition
-    dbgs() << __FILE__ << ":" << __LINE__ << "\n";
 
   // FIXME: Really want an SMLoc here!
   TP.error("Type inference contradiction found, merging '" +
