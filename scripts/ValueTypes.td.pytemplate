@@ -1,0 +1,56 @@
+//===- ValueTypes.td - ValueType definitions ---------------*- tablegen -*-===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// Value types - These values correspond to the register types defined in the
+// ValueTypes.h file.  If you update anything here, you must update it there as
+// well!
+//
+//===----------------------------------------------------------------------===//
+
+class ValueType<int size, int value> {
+  string Namespace = "MVT";
+  int Size = size;
+  int Value = value;
+}
+
+def OtherVT: ValueType<0  ,  0>;   // "Other" value
+${int_value_type_defs}
+def f16    : ValueType<16 , $f16>;   // 16-bit floating point value
+def f32    : ValueType<32 , $f32>;   // 32-bit floating point value
+def f64    : ValueType<64 , $f64>;   // 64-bit floating point value
+def f80    : ValueType<80 , $f80>;   // 80-bit floating point value
+def f128   : ValueType<128, $f128>;   // 128-bit floating point value
+def ppcf128: ValueType<128, $ppcf128>;   // PPC 128-bit floating point value
+
+${int_vector_value_type_defs}
+
+${float_vector_value_type_defs}
+
+def x86mmx : ValueType<64 , $x86mmx>;   // X86 MMX value
+def FlagVT : ValueType<0  , $Glue>;   // Pre-RA sched glue
+def isVoid : ValueType<0  , $isVoid>;   // Produces no value
+def untyped: ValueType<8  , $Untyped>;   // Produces an untyped value
+
+def MetadataVT: ValueType<0, 250>; // Metadata
+
+// Pseudo valuetype mapped to the current pointer size to any address space.
+// Should only be used in TableGen.
+def iPTRAny   : ValueType<0, 251>;
+
+// Pseudo valuetype to represent "vector of any size"
+def vAny   : ValueType<0  , 252>;
+
+// Pseudo valuetype to represent "float of any format"
+def fAny   : ValueType<0  , 253>;
+
+// Pseudo valuetype to represent "integer of any bit width"
+def iAny   : ValueType<0  , 254>;
+
+// Pseudo valuetype mapped to the current pointer size.
+def iPTR   : ValueType<0  , 255>;
