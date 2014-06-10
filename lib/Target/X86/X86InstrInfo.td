@@ -1917,6 +1917,17 @@ let Predicates = [HasBMI2] in {
                                int_x86_bmi_pext_64, loadi64>, T8XS, VEX_W;
 }
 
+//let Predicates = [HasBMI2] in {
+//  def : Pat <(v32i1 (bitconvert (i32 GR32:$src))), (v32i1 GR32:$src)>;
+def : Pat <(i32 (bitconvert (v32i1 VR32:$src))), (i32 VR32:$src)>;
+def : Pat <(i32 (bitconvert (v4i8 VR32:$src))), (i32 VR32:$src)>;
+def : Pat <(v4i8 (bitconvert (i32 VR32:$src))), (v4i8 VR32:$src)>;
+def : Pat <(v4i8 (bitconvert (v32i1 VR32:$src))), (v4i8 VR32:$src)>;
+def : Pat <(v32i1 (bitconvert (v4i8 VR32:$src))), (v32i1 VR32:$src)>;
+def : Pat <(v32i1 (bitconvert (i32 VR32:$src))), (v32i1 VR32:$src)>;
+  //def : Pat <(i64 (bitconvert (v64i1 GR64:$src))), (i64 GR64:$src)>;
+//}
+
 //===----------------------------------------------------------------------===//
 // TBM Instructions
 //

@@ -287,6 +287,10 @@ void X86TargetLowering::resetOperationActions() {
   addRegisterClass(MVT::i8, &X86::GR8RegClass);
   addRegisterClass(MVT::i16, &X86::GR16RegClass);
   addRegisterClass(MVT::i32, &X86::GR32RegClass);
+
+  //My Edition
+  addRegisterClass(MVT::v32i1, &X86::VR32RegClass);
+
   if (Subtarget->is64Bit())
     addRegisterClass(MVT::i64, &X86::GR64RegClass);
 
@@ -868,6 +872,10 @@ void X86TargetLowering::resetOperationActions() {
     setLoadExtAction(ISD::ZEXTLOAD, VT, Expand);
     setLoadExtAction(ISD::EXTLOAD, VT, Expand);
   }
+  //Add Here in case of being overwriting.
+  setOperationAction(ISD::VECTOR_SHUFFLE, MVT::v32i1, Custom);
+  setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v32i1, Custom);
+  setOperationAction(ISD::SIGN_EXTEND, MVT::v32i8, Custom);
 
   // FIXME: In order to prevent SSE instructions being expanded to MMX ones
   // with -msoft-float, disable use of MMX as well.
@@ -907,6 +915,8 @@ void X86TargetLowering::resetOperationActions() {
   setOperationAction(ISD::BITCAST,            MVT::v4i16, Expand);
   setOperationAction(ISD::BITCAST,            MVT::v2i32, Expand);
   setOperationAction(ISD::BITCAST,            MVT::v1i64, Expand);
+
+  setOperationAction(ISD::BITCAST,            MVT::v32i1, Legal);
 
   if (!TM.Options.UseSoftFloat && Subtarget->hasSSE1()) {
     addRegisterClass(MVT::v4f32, &X86::VR128RegClass);
@@ -1226,6 +1236,7 @@ void X86TargetLowering::resetOperationActions() {
       setOperationAction(ISD::MUL,             MVT::v16i16, Legal);
       // Don't lower v32i8 because there is no 128-bit byte mul
 
+      //dbgs() << "Custom v32i8 for vselect.\n";
       setOperationAction(ISD::VSELECT,         MVT::v32i8, Legal);
 
       setOperationAction(ISD::SDIV,            MVT::v8i32, Custom);
@@ -1295,6 +1306,7 @@ void X86TargetLowering::resetOperationActions() {
       AddPromotedToType (ISD::XOR,    VT, MVT::v4i64);
       setOperationAction(ISD::LOAD,   VT, Promote);
       AddPromotedToType (ISD::LOAD,   VT, MVT::v4i64);
+      dbgs() << "Promote SELECT.\n";
       setOperationAction(ISD::SELECT, VT, Promote);
       AddPromotedToType (ISD::SELECT, VT, MVT::v4i64);
     }
@@ -2226,6 +2238,10 @@ X86TargetLowering::LowerFormalArguments(SDValue Chain,
         RC = &X86::VK8RegClass;
       else if (RegVT == MVT::v16i1)
         RC = &X86::VK16RegClass;
+
+      //Add to make v32i1 as argument available
+      else if (RegVT == MVT::v32i1)
+          RC = &X86::VR32RegClass;
       else
         llvm_unreachable("Unknown argument type!");
 
@@ -3632,6 +3648,9 @@ static bool isPALIGNRMask(ArrayRef<int> Mask, MVT VT,
   if ((VT.is128BitVector() && !Subtarget->hasSSSE3()) ||
       (VT.is256BitVector() && !Subtarget->hasInt256()))
     return false;
+  //Return false when VT's Bit Size is less than 128
+  if (VT.getSizeInBits() < 128)
+    return false;
 
   unsigned NumElts = VT.getVectorNumElements();
   unsigned NumLanes = VT.is512BitVector() ? 1: VT.getSizeInBits()/128;
@@ -3790,6 +3809,31 @@ static bool isMOVHLPSMask(ArrayRef<int> Mask, MVT VT) {
          isUndefOrEqual(Mask[1], 7) &&
          isUndefOrEqual(Mask[2], 2) &&
          isUndefOrEqual(Mask[3], 3);
+}
+
+/// isPEXTMask - Return true if the specified VECTOR_SHUFFLE operand
+/// specifies a shuffle of elements that is suitable for input to PEXT in haswell architecture.
+static bool isPEXTMask(ArrayRef<int> Mask, MVT VT, SDValue V1, SDValue V2) {
+
+    dbgs() << "In isPEXTMask.\n";
+    for (unsigned i = 0; i < Mask.size(); ++i) {
+        dbgs() << Mask[i] << ".\n";
+    }
+    if (VT != MVT::v32i1)
+        return false;
+    if (ConstantSDNode *CN = dyn_cast<ConstantSDNode>(
+            V2.getOperand(0))) {
+        if (!CN->isNullValue())
+            //If elements in V2 are not Zero
+            return false;
+    }
+
+    //FIXME:Change the check
+    if (Mask[Mask.size() - 1] != 31) {
+        return false;
+    }
+
+    return true;
 }
 
 /// isMOVHLPS_v_undef_Mask - Special case of isMOVHLPSMask for canonical form
@@ -4798,6 +4842,35 @@ static SDValue getMOVL(SelectionDAG &DAG, SDLoc dl, EVT VT, SDValue V1,
   for (unsigned i = 1; i != NumElems; ++i)
     Mask.push_back(i);
   return DAG.getVectorShuffle(VT, dl, V1, V2, &Mask[0]);
+}
+
+/// getPEXT - Returns a PEXT node for an pext operation.
+static SDValue getPEXT(SelectionDAG &DAG, SDLoc dl, EVT VT, SDValue V1,
+                       SDValue V2, ArrayRef<int> Mask) {
+    //TODO: We can use bitcast to support the wider vector types
+    if (VT == MVT::v32i1) {
+
+        unsigned NumElts = Mask.size();
+        unsigned IntMask = 0;
+        for (unsigned i = 0; i < NumElts; ++i) {
+            if (Mask[i] < 32) {
+                IntMask |= 0x1 << Mask[i];
+            }
+        }
+
+        SDValue V = DAG.getNode(ISD::INTRINSIC_WO_CHAIN, dl,
+            MVT::i32,
+            DAG.getConstant(Intrinsic::x86_bmi_pext_32, MVT::i32),
+            //Operand 1,
+            DAG.getNode(ISD::BITCAST, dl, MVT::i32, V1),
+            //Operand 2,
+            DAG.getConstant(IntMask, MVT::i32));
+        V.dumpr();
+        return V;
+    }
+
+    return SDValue();
+
 }
 
 /// getUnpackl - Returns a vector_shuffle node for an unpackl operation.
@@ -7321,8 +7394,10 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
     return getMOVHighToLow(Op, dl, DAG);
 
   // Use to match splats
-  if (HasSSE2 && isUNPCKHMask(M, VT, HasInt256) && V2IsUndef &&
-      (VT == MVT::v2f64 || VT == MVT::v2i64))
+    //Chang the order because the isUNPCKHMask will raise error when
+    //MVT::v32i1
+  if ((VT == MVT::v2f64 || VT == MVT::v2i64) &&
+      HasSSE2 && isUNPCKHMask(M, VT, HasInt256) && V2IsUndef)
     return getTargetShuffleNode(X86ISD::UNPCKH, dl, VT, V1, V1, DAG);
 
   if (isPSHUFDMask(M, VT)) {
@@ -7425,6 +7500,20 @@ X86TargetLowering::LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const {
     // swapped operands to undo the commute.
     return getMOVL(DAG, dl, VT, V2, V1);
   }
+
+  if (V2IsSplat) {
+      dbgs() << "v2 is Splat.\n";
+  }
+  if (ISD::isBuildVectorAllZeros(V2.getNode())) {
+      dbgs() << "v2 is All Zeros.\n";
+  }
+
+
+  if (V2IsSplat && isPEXTMask(M, VT, V1, V2)) {
+      dbgs() << "In PEXT Check.\n";
+      return getPEXT(DAG, dl, VT, V1, V2, M);
+  }
+
 
   if (isUNPCKLMask(M, VT, HasInt256))
     return getTargetShuffleNode(X86ISD::UNPCKL, dl, VT, V1, V2, DAG);
@@ -10174,7 +10263,29 @@ static bool isTruncWithZeroHighBitsInput(SDValue V, SelectionDAG &DAG) {
   return DAG.MaskedValueIsZero(VOp0, APInt::getHighBitsSet(InBits,InBits-Bits));
 }
 
+SDValue X86TargetLowering::LowerVSELECT(SDValue Op, SelectionDAG &DAG) const {
+
+    dbgs() << "In LowerVSELECT.\n";
+    //TODO:if AVX2 promote v32i1 to v32i8
+    //if
+    SDValue Cond = Op.getOperand(0);
+    SDValue Op1 = Op.getOperand(1);
+    SDValue Op2 = Op.getOperand(2);
+    SDLoc dl(Op);
+    EVT VT = Op1.getValueType();
+    if (Subtarget->hasInt256()
+        && Cond.getValueType() == MVT::v32i1) {
+        dbgs() << "Get right place.\n";
+
+        //Cond = DAG.getNode(X86ISD::VSEXT_MOVL, dl, VT, Cond);
+        Cond = DAG.getNode(ISD::SIGN_EXTEND, dl, VT, Cond);
+        //Cond = DAG.getNode(X86ISD::VSEXT, dl, VT, Cond);
+        return DAG.getNode(ISD::VSELECT, dl, VT, Cond, Op1, Op2);
+    }
+    return Op;
+}
 SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
+    dbgs() << "In LowerSELECT.\n";
   bool addTest = true;
   SDValue Cond  = Op.getOperand(0);
   SDValue Op1 = Op.getOperand(1);
@@ -10386,15 +10497,67 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   return DAG.getNode(X86ISD::CMOV, DL, VTs, Ops, array_lengthof(Ops));
 }
 
+static SDValue LowerSIGN_EXTEND_V32i1(SDValue Op, SelectionDAG &DAG) {
+    SDValue Cond = Op->getOperand(0);
+    MVT CondVT = Cond.getSimpleValueType();
+    SDLoc dl(Op);
+
+    dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+    if (CondVT != MVT::v32i1) {
+        return SDValue();
+    }
+    dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+
+    SDValue A = DAG.getNode(ISD::BITCAST, dl, MVT::i32, Cond);
+    SDValue B = DAG.getNode(X86ISD::VBROADCAST, dl, MVT::v8i32, A);
+    //TODO:TO put the value in right place
+    //Maybe we can use pdep to do better.
+    dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+    SmallVector<SDValue, 8> Ctrl;
+    for (unsigned i = 0; i < 8; ++i) {
+        Ctrl.push_back(DAG.getConstant(i * 4, MVT::i32));
+    }
+    SDValue BV = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v8i32, &Ctrl[0], 8);
+
+    dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+    SDValue C0 = DAG.getNode(ISD::SHL, dl, MVT::v8i32, B, BV);
+
+
+    SDValue M = DAG.getConstant(0xF0000000, MVT::i32);
+    SDValue Masks = DAG.getNode(X86ISD::VBROADCAST, dl, MVT::v8i32, M);
+
+    SDValue C1 = DAG.getNode(ISD::AND, dl, MVT::v8i32, C0, Masks);
+
+    SmallVector <SDValue, 8> Ctrl1;
+    for (unsigned i = 0; i < 8; ++i) {
+        Ctrl1.push_back(DAG.getConstant(7, MVT::i32));
+    }
+
+    SDValue BV1 = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v8i32, &Ctrl1[0], 8);
+
+    SDValue C2 = DAG.getNode(ISD::SRL, dl, MVT::v8i32, C1, BV1);
+    SDValue C3 = DAG.getNode(ISD::SRL, dl, MVT::v8i32, C2, BV1);
+    SDValue C4 = DAG.getNode(ISD::SRL, dl, MVT::v8i32, C3, BV1);
+
+    SDValue Ret = DAG.getNode(ISD::AND, dl, MVT::v8i32, C1, C2);
+    SDValue Ret1 = DAG.getNode(ISD::AND, dl, MVT::v8i32, C3, C4);
+    Ret = DAG.getNode(ISD::AND, dl, MVT::v8i32, Ret, Ret1);
+    dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+
+    return DAG.getNode(ISD::BITCAST, dl, MVT::v32i8, Ret);
+}
 static SDValue LowerSIGN_EXTEND_AVX512(SDValue Op, SelectionDAG &DAG) {
   MVT VT = Op->getSimpleValueType(0);
   SDValue In = Op->getOperand(0);
   MVT InVT = In.getSimpleValueType();
   SDLoc dl(Op);
 
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
   unsigned int NumElts = VT.getVectorNumElements();
-  if (NumElts != 8 && NumElts != 16)
+  if (NumElts != 8 && NumElts != 16
+      && NumElts != 32)
     return SDValue();
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
 
   if (VT.is512BitVector() && InVT.getVectorElementType() != MVT::i1)
     return DAG.getNode(X86ISD::VSEXT, dl, VT, In);
@@ -10403,6 +10566,8 @@ static SDValue LowerSIGN_EXTEND_AVX512(SDValue Op, SelectionDAG &DAG) {
   assert (InVT.getVectorElementType() == MVT::i1 && "Unexpected vector type");
 
   MVT ExtVT = (NumElts == 8) ? MVT::v8i64 : MVT::v16i32;
+  if (NumElts == 32)
+      ExtVT = MVT::v32i16;
   Constant *C = ConstantInt::get(*DAG.getContext(),
     APInt::getAllOnesValue(ExtVT.getScalarType().getSizeInBits()));
 
@@ -10411,7 +10576,9 @@ static SDValue LowerSIGN_EXTEND_AVX512(SDValue Op, SelectionDAG &DAG) {
   SDValue Ld = DAG.getLoad(ExtVT.getScalarType(), dl, DAG.getEntryNode(), CP,
                           MachinePointerInfo::getConstantPool(),
                           false, false, false, Alignment);
+  Ld.dumpr();
   SDValue Brcst = DAG.getNode(X86ISD::VBROADCASTM, dl, ExtVT, In, Ld);
+  Brcst.dumpr();
   if (VT.is512BitVector())
     return Brcst;
   return DAG.getNode(X86ISD::VTRUNC, dl, VT, Brcst);
@@ -10419,22 +10586,31 @@ static SDValue LowerSIGN_EXTEND_AVX512(SDValue Op, SelectionDAG &DAG) {
 
 static SDValue LowerSIGN_EXTEND(SDValue Op, const X86Subtarget *Subtarget,
                                 SelectionDAG &DAG) {
+    dbgs() << "In LowerSIGN_EXTEND.\n";
   MVT VT = Op->getSimpleValueType(0);
   SDValue In = Op->getOperand(0);
   MVT InVT = In.getSimpleValueType();
   SDLoc dl(Op);
 
+  if (InVT == MVT::v32i1 && VT == MVT::v32i8) {
+      //TODO
+      return LowerSIGN_EXTEND_V32i1(Op, DAG);
+  }
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
   if (VT.is512BitVector() || InVT.getVectorElementType() == MVT::i1)
     return LowerSIGN_EXTEND_AVX512(Op, DAG);
 
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
   if ((VT != MVT::v4i64 || InVT != MVT::v4i32) &&
       (VT != MVT::v8i32 || InVT != MVT::v8i16) &&
       (VT != MVT::v16i16 || InVT != MVT::v16i8))
     return SDValue();
 
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
   if (Subtarget->hasInt256())
     return DAG.getNode(X86ISD::VSEXT_MOVL, dl, VT, In);
 
+  dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
   // Optimize vectors in AVX mode
   // Sign extend  v8i16 to v8i32 and
   //              v4i32 to v4i64
@@ -13436,6 +13612,7 @@ SDValue X86TargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::FGETSIGN:           return LowerFGETSIGN(Op, DAG);
   case ISD::SETCC:              return LowerSETCC(Op, DAG);
   case ISD::SELECT:             return LowerSELECT(Op, DAG);
+      //case ISD::VSELECT:            return LowerVSELECT(Op, DAG);
   case ISD::BRCOND:             return LowerBRCOND(Op, DAG);
   case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
   case ISD::VASTART:            return LowerVASTART(Op, DAG);
@@ -13530,10 +13707,12 @@ ReplaceATOMIC_BINARY_64(SDNode *Node, SmallVectorImpl<SDValue>&Results,
 void X86TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>&Results,
                                            SelectionDAG &DAG) const {
+    dbgs() << "In ReplaceNodeResults.\n";
   SDLoc dl(N);
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   switch (N->getOpcode()) {
   default:
+      N->dumpr();
     llvm_unreachable("Do not know how to custom type legalize this operation!");
   case ISD::SIGN_EXTEND_INREG:
   case ISD::ADDC:
@@ -16749,6 +16928,17 @@ static SDValue PerformSELECTCombine(SDNode *N, SelectionDAG &DAG,
   }
 
   EVT CondVT = Cond.getValueType();
+  if (Subtarget->hasInt256() && VT.isVector() && CondVT.isVector() &&
+      CondVT.getVectorElementType() == MVT::i1) {
+    EVT OpVT = LHS.getValueType();
+    if (OpVT.is256BitVector() &&
+        OpVT.getVectorElementType() == MVT::i8) {
+        dbgs() << __FILE__ << ":" << __LINE__ << ".\n";
+        Cond = DAG.getNode(ISD::SIGN_EXTEND, DL, OpVT, Cond);
+        DCI.AddToWorklist(Cond.getNode());
+        return DAG.getNode(N->getOpcode(), DL, OpVT, Cond, LHS, RHS);
+    }
+  }
   if (Subtarget->hasAVX512() && VT.isVector() && CondVT.isVector() &&
       CondVT.getVectorElementType() == MVT::i1) {
     // v16i8 (select v16i1, v16i8, v16i8) does not have a proper
