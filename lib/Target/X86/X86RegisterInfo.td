@@ -433,7 +433,8 @@ def RST : RegisterClass<"X86", [f80, f64, f32], 32, (sequence "ST%u", 0, 7)> {
 
 // Generic vector registers: VR64 and VR128.
 def VR64: RegisterClass<"X86", [x86mmx], 64, (sequence "MM%u", 0, 7)>;
-def VR128 : RegisterClass<"X86", [v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+def VR128 : RegisterClass<"X86", [v128i1, v64i2, v32i4, v16i8, v8i16, 
+                                  v4i32, v2i64, v1i128, v4f32, v2f64],
                           128, (add FR32)>;
 def VR256 : RegisterClass<"X86", [v32i8, v16i16, v8i32, v4i64, v8f32, v4f64],
                           256, (sequence "YMM%u", 0, 15)>;
