@@ -333,31 +333,43 @@ let Predicates = [HasSSE2] in {
   def : Pat<(v2i64 (bitconvert (v16i8 VR128:$src))), (v2i64 VR128:$src)>;
   def : Pat<(v2i64 (bitconvert (v2f64 VR128:$src))), (v2i64 VR128:$src)>;
   def : Pat<(v2i64 (bitconvert (v4f32 VR128:$src))), (v2i64 VR128:$src)>;
+  def : Pat<(v2i64 (bitconvert (v64i2 VR128:$src))), (v2i64 VR128:$src)>;
   def : Pat<(v4i32 (bitconvert (v2i64 VR128:$src))), (v4i32 VR128:$src)>;
   def : Pat<(v4i32 (bitconvert (v8i16 VR128:$src))), (v4i32 VR128:$src)>;
   def : Pat<(v4i32 (bitconvert (v16i8 VR128:$src))), (v4i32 VR128:$src)>;
   def : Pat<(v4i32 (bitconvert (v2f64 VR128:$src))), (v4i32 VR128:$src)>;
   def : Pat<(v4i32 (bitconvert (v4f32 VR128:$src))), (v4i32 VR128:$src)>;
+  def : Pat<(v4i32 (bitconvert (v64i2 VR128:$src))), (v4i32 VR128:$src)>;
   def : Pat<(v8i16 (bitconvert (v2i64 VR128:$src))), (v8i16 VR128:$src)>;
   def : Pat<(v8i16 (bitconvert (v4i32 VR128:$src))), (v8i16 VR128:$src)>;
   def : Pat<(v8i16 (bitconvert (v16i8 VR128:$src))), (v8i16 VR128:$src)>;
   def : Pat<(v8i16 (bitconvert (v2f64 VR128:$src))), (v8i16 VR128:$src)>;
   def : Pat<(v8i16 (bitconvert (v4f32 VR128:$src))), (v8i16 VR128:$src)>;
+  def : Pat<(v8i16 (bitconvert (v64i2 VR128:$src))), (v8i16 VR128:$src)>;
   def : Pat<(v16i8 (bitconvert (v2i64 VR128:$src))), (v16i8 VR128:$src)>;
   def : Pat<(v16i8 (bitconvert (v4i32 VR128:$src))), (v16i8 VR128:$src)>;
   def : Pat<(v16i8 (bitconvert (v8i16 VR128:$src))), (v16i8 VR128:$src)>;
   def : Pat<(v16i8 (bitconvert (v2f64 VR128:$src))), (v16i8 VR128:$src)>;
   def : Pat<(v16i8 (bitconvert (v4f32 VR128:$src))), (v16i8 VR128:$src)>;
+  def : Pat<(v16i8 (bitconvert (v64i2 VR128:$src))), (v16i8 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v2i64 VR128:$src))), (v64i2 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v4i32 VR128:$src))), (v64i2 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v8i16 VR128:$src))), (v64i2 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v16i8 VR128:$src))), (v64i2 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v2f64 VR128:$src))), (v64i2 VR128:$src)>;
+  def : Pat<(v64i2 (bitconvert (v4f32 VR128:$src))), (v64i2 VR128:$src)>;
   def : Pat<(v4f32 (bitconvert (v2i64 VR128:$src))), (v4f32 VR128:$src)>;
   def : Pat<(v4f32 (bitconvert (v4i32 VR128:$src))), (v4f32 VR128:$src)>;
   def : Pat<(v4f32 (bitconvert (v8i16 VR128:$src))), (v4f32 VR128:$src)>;
   def : Pat<(v4f32 (bitconvert (v16i8 VR128:$src))), (v4f32 VR128:$src)>;
   def : Pat<(v4f32 (bitconvert (v2f64 VR128:$src))), (v4f32 VR128:$src)>;
+  def : Pat<(v4f32 (bitconvert (v64i2 VR128:$src))), (v4f32 VR128:$src)>;
   def : Pat<(v2f64 (bitconvert (v2i64 VR128:$src))), (v2f64 VR128:$src)>;
   def : Pat<(v2f64 (bitconvert (v4i32 VR128:$src))), (v2f64 VR128:$src)>;
   def : Pat<(v2f64 (bitconvert (v8i16 VR128:$src))), (v2f64 VR128:$src)>;
   def : Pat<(v2f64 (bitconvert (v16i8 VR128:$src))), (v2f64 VR128:$src)>;
   def : Pat<(v2f64 (bitconvert (v4f32 VR128:$src))), (v2f64 VR128:$src)>;
+  def : Pat<(v2f64 (bitconvert (v64i2 VR128:$src))), (v2f64 VR128:$src)>;
 }
 
 // Bitcasts between 256-bit vector types. Return the original type since

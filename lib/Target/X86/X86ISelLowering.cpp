@@ -1020,12 +1020,16 @@ void X86TargetLowering::resetOperationActions() {
       AddPromotedToType (ISD::SELECT, VT, MVT::v2i64);
     }
 
+    // TODO: add support for other types
+    setOperationAction(ISD::LOAD, MVT::v64i2, Promote);
+    AddPromotedToType (ISD::LOAD, MVT::v64i2, MVT::v2i64);
+
     setTruncStoreAction(MVT::f64, MVT::f32, Expand);
 
     // Custom lower v2i64 and v2f64 selects.
     setOperationAction(ISD::LOAD,               MVT::v2f64, Legal);
     setOperationAction(ISD::LOAD,               MVT::v2i64, Legal);
-    setOperationAction(ISD::LOAD,               MVT::v64i2, Legal);
+    //setOperationAction(ISD::LOAD,               MVT::v64i2, Legal);
     setOperationAction(ISD::SELECT,             MVT::v2f64, Custom);
     setOperationAction(ISD::SELECT,             MVT::v2i64, Custom);
     setOperationAction(ISD::SELECT,             MVT::v64i2, Custom);

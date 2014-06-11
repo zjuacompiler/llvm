@@ -40,7 +40,7 @@ def RetCC_X86Common : CallingConv<[
   // Vector types are returned in XMM0 and XMM1, when they fit.  XMM2 and XMM3
   // can only be used by ABI non-compliant code. If the target doesn't have XMM
   // registers, it won't have vector types.
-  CCIfType<[v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64],
             CCAssignToReg<[XMM0,XMM1,XMM2,XMM3]>>,
 
   // 256-bit vectors are returned in YMM0 and XMM1, when they fit. YMM2 and YMM3
@@ -97,7 +97,7 @@ def RetCC_X86_32_Fast : CallingConv<[
 // Intel_OCL_BI return-value convention.
 def RetCC_Intel_OCL_BI : CallingConv<[
   // Vector types are returned in XMM0,XMM1,XMMM2 and XMM3.
-  CCIfType<[f32, f64, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[f32, f64, v4i32, v2i64, v64i2, v4f32, v2f64],
             CCAssignToReg<[XMM0,XMM1,XMM2,XMM3]>>,
 
   // 256-bit FP vectors
@@ -237,7 +237,7 @@ def CC_X86_64_C : CallingConv<[
             CCPromoteToType<v2i64>>>>,
 
   // The first 8 FP/Vector arguments are passed in XMM registers.
-  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64],
             CCIfSubtarget<"hasSSE1()",
             CCAssignToReg<[XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7]>>>,
 
@@ -265,7 +265,7 @@ def CC_X86_64_C : CallingConv<[
   CCIfType<[f80], CCAssignToStack<0, 0>>,
 
   // Vectors get 16-byte stack slots that are 16-byte aligned.
-  CCIfType<[v16i8, v8i16, v4i32, v2i64, v4f32, v2f64], CCAssignToStack<16, 16>>,
+  CCIfType<[v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64], CCAssignToStack<16, 16>>,
 
   // 256-bit vectors get 32-byte stack slots that are 32-byte aligned.
   CCIfType<[v32i8, v16i16, v8i32, v4i64, v8f32, v4f64],
@@ -288,7 +288,7 @@ def CC_X86_Win64_C : CallingConv<[
   CCIfNest<CCAssignToReg<[R10]>>,
 
   // 128 bit vectors are passed by pointer
-  CCIfType<[v16i8, v8i16, v4i32, v2i64, v4f32, v2f64], CCPassIndirect<i64>>,
+  CCIfType<[v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64], CCPassIndirect<i64>>,
 
 
   // 256 bit vectors are passed by pointer
@@ -314,7 +314,7 @@ def CC_X86_Win64_C : CallingConv<[
                                           [XMM0, XMM1, XMM2, XMM3]>>,
 
   // The first 4 FP/Vector arguments are passed in XMM registers.
-  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64],
            CCAssignToRegWithShadow<[XMM0, XMM1, XMM2, XMM3],
                                    [RCX , RDX , R8  , R9  ]>>,
 
@@ -336,7 +336,7 @@ def CC_X86_64_GHC : CallingConv<[
             CCAssignToReg<[R13, RBP, R12, RBX, R14, RSI, RDI, R8, R9, R15]>>,
 
   // Pass in STG registers: F1, F2, F3, F4, D1, D2
-  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[f32, f64, v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64],
             CCIfSubtarget<"hasSSE1()",
             CCAssignToReg<[XMM1, XMM2, XMM3, XMM4, XMM5, XMM6]>>>
 ]>;
@@ -405,7 +405,7 @@ def CC_X86_32_Common : CallingConv<[
   CCIfType<[f80], CCAssignToStack<0, 4>>,
 
   // The first 4 SSE vector arguments are passed in XMM registers.
-  CCIfNotVarArg<CCIfType<[v16i8, v8i16, v4i32, v2i64, v4f32, v2f64],
+  CCIfNotVarArg<CCIfType<[v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64],
                 CCAssignToReg<[XMM0, XMM1, XMM2, XMM3]>>>,
 
   // The first 4 AVX 256-bit vector arguments are passed in YMM registers.
@@ -414,7 +414,7 @@ def CC_X86_32_Common : CallingConv<[
                 CCAssignToReg<[YMM0, YMM1, YMM2, YMM3]>>>>,
 
   // Other SSE vectors get 16-byte stack slots that are 16-byte aligned.
-  CCIfType<[v16i8, v8i16, v4i32, v2i64, v4f32, v2f64], CCAssignToStack<16, 16>>,
+  CCIfType<[v16i8, v8i16, v4i32, v2i64, v64i2, v4f32, v2f64], CCAssignToStack<16, 16>>,
 
   // 256-bit AVX vectors get 32-byte stack slots that are 32-byte aligned.
   CCIfType<[v32i8, v16i16, v8i32, v4i64, v8f32, v4f64],
@@ -527,7 +527,7 @@ def CC_Intel_OCL_BI : CallingConv<[
   CCIfType<[i32], CCAssignToStack<4, 4>>,
 
   // The SSE vector arguments are passed in XMM registers.
-  CCIfType<[f32, f64, v4i32, v2i64, v4f32, v2f64],
+  CCIfType<[f32, f64, v4i32, v2i64, v64i2, v4f32, v2f64],
            CCAssignToReg<[XMM0, XMM1, XMM2, XMM3]>>,
 
   // The 256-bit vector arguments are passed in YMM registers.
