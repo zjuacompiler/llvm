@@ -12483,11 +12483,44 @@ static SDValue LowerADD(SDValue Op, SelectionDAG &DAG) {
   return Lowerv64i2Add(Op, DAG);
 }
 
+static SDValue Lowerv64i2Sub(SDValue Op, SelectionDAG &DAG) {
+  SDValue LHS = Op.getOperand(0);
+  SDValue RHS = Op.getOperand(1);
+  SDLoc dl(Op);
+  EVT VT = MVT::getVectorVT(MVT::i8, 16);
+
+  SDValue A = DAG.getNode(ISD::BITCAST, dl, VT, LHS);
+  SDValue B = DAG.getNode(ISD::BITCAST, dl, VT, RHS);
+
+  // get bit sub using xor
+  SDValue BitSub = DAG.getNode(ISD::XOR, dl, VT, A, B);
+
+  // get carry bits
+  SmallVector<SDValue, 16> V_All1(16, DAG.getConstant(0xFF,
+  MVT::i8));
+  SDValue Mask_All1 = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &V_All1[0], 16);
+  SDValue Carry1 = DAG.getNode(ISD::XOR, dl, VT, A, Mask_All1);
+  Carry1 = DAG.getNode(ISD::AND, dl, VT, Carry1, B);
+
+  SmallVector<SDValue, 16> V(16, DAG.getConstant(0x55,
+    MVT::i8));
+  SDValue Mask = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &V[0], 16);
+  SDValue Carry2 = DAG.getNode(ISD::AND, dl, VT, Carry1, Mask);
+  SDValue Carry3 = DAG.getNode(ISD::ADD, dl, VT, Carry2, Carry2);
+
+  SDValue Result = DAG.getNode(ISD::XOR, dl, VT, BitSub, Carry3);
+
+  return DAG.getNode(ISD::BITCAST, dl, MVT::v64i2, Result);
+}
+
 static SDValue LowerSUB(SDValue Op, SelectionDAG &DAG) {
-  assert(Op.getValueType().is256BitVector() &&
-         Op.getValueType().isInteger() &&
-         "Only handle AVX 256-bit vector integer operation");
-  return Lower256IntArith(Op, DAG);
+  if (Op.getValueType().is256BitVector() &&
+    Op.getValueType().isInteger()) {
+      return Lower256IntArith(Op, DAG);
+  }
+  assert(Op.getValueType().getSimpleVT() == MVT::v64i2 &&
+    "Only handle AVX 256-bit vector integer operation or v64i2");
+  return Lowerv64i2Sub(Op, DAG);
 }
 
 static SDValue LowerMUL(SDValue Op, const X86Subtarget *Subtarget,
