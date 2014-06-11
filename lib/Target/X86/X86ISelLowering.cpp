@@ -12524,6 +12524,29 @@ static SDValue LowerMUL(SDValue Op, const X86Subtarget *Subtarget,
     // shuffles.
     static const int ShufMask[] = { 0, 4, 2, 6 };
     return DAG.getVectorShuffle(VT, dl, Evens, Odds, ShufMask);
+  } else if (VT == MVT::v64i2) {
+    EVT VTLo = MVT::getVectorVT(MVT::i8, 16);
+    SDValue Abit128 = DAG.getNode(ISD::BITCAST, dl, VTLo, A);
+    SDValue Bbit128 = DAG.getNode(ISD::BITCAST, dl, VTLo, B);
+    SDValue Lower = DAG.getNode(ISD::AND, dl, VTLo, Abit128, Bbit128);
+    SmallVector<SDValue, 16> V(16, DAG.getConstant(0x55,
+                                                   MVT::i8));
+    SDValue Mask = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &V[0], 16);
+    Lower = DAG.getNode(ISD::AND, dl, VTLo, Lower, Mask);
+
+    SDValue Shl = DAG.getNode(ISD::SHL, dl, VTLo, Bbit128,
+                              DAG.getConstant(0x01, MVT::v16i8));
+    Shl = DAG.getNode(ISD::AND, dl, VTLo, Shl, Abit128);
+    SDValue Shr = DAG.getNode(ISD::SHL, dl, VTLo, Abit128,
+                               DAG.getConstant(0x01, MVT::v16i8));
+    Shr = DAG.getNode(ISD::AND, dl, VTLo, Shr, Bbit128);
+    SDValue Higher = DAG.getNode(ISD::XOR, dl, VTLo, Shl, Shr);
+    SmallVector<SDValue, 16> Vh(16, DAG.getConstant(0xAA,
+                                                   MVT::i8));
+    SDValue MaskHigh = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &Vh[0], 16);
+    Higher = DAG.getNode(ISD::AND, dl, VTLo, Higher, MaskHigh);
+    SDValue Res = DAG.getNode(ISD::XOR, dl, VTLo, Lower, Higher);
+    return DAG.getNode(ISD::BITCAST, dl, MVT::v64i2, Res);
   }
 
   assert((VT == MVT::v2i64 || VT == MVT::v4i64 || VT == MVT::v8i64) &&
