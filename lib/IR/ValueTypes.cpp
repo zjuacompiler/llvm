@@ -134,6 +134,7 @@ std::string EVT::getEVTString() const {
   case MVT::v16i1:   return "v16i1";
   case MVT::v32i1:   return "v32i1";
   case MVT::v64i1:   return "v64i1";
+  case MVT::v64i2:   return "v64i2";
   case MVT::v1i8:    return "v1i8";
   case MVT::v2i8:    return "v2i8";
   case MVT::v4i8:    return "v4i8";
@@ -202,6 +203,7 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::v16i1:   return VectorType::get(Type::getInt1Ty(Context), 16);
   case MVT::v32i1:   return VectorType::get(Type::getInt1Ty(Context), 32);
   case MVT::v64i1:   return VectorType::get(Type::getInt1Ty(Context), 64);
+  case MVT::v64i2:   return VectorType::get(Type::getIntNTy(Context, 2), 64);
   case MVT::v1i8:    return VectorType::get(Type::getInt8Ty(Context), 1);
   case MVT::v2i8:    return VectorType::get(Type::getInt8Ty(Context), 2);
   case MVT::v4i8:    return VectorType::get(Type::getInt8Ty(Context), 4);
