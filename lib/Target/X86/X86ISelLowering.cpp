@@ -9894,6 +9894,56 @@ static SDValue LowerIntVSETCC_AVX512(SDValue Op, SelectionDAG &DAG) {
 
 }
 
+static SDValue Lowerv64i2EQ(SDValue Op, const X86Subtarget *Subtarget,
+                           SelectionDAG &DAG){
+  SDValue Op0 = Op.getOperand(0);
+  SDValue Op1 = Op.getOperand(1);
+  SDLoc dl(Op);
+  SDValue Op0Cast = DAG.getNode(ISD::BITCAST, dl, MVT::v16i8, Op0);
+  SDValue Op1Cast = DAG.getNode(ISD::BITCAST, dl, MVT::v16i8, Op1);
+  SDValue XOR = DAG.getNode(ISD::XOR, dl, MVT::v16i8, Op0Cast, Op1Cast);
+  SmallVector<SDValue, 16> Temp1(16, DAG.getConstant(0xFFU, MVT::i8));
+  SDValue One = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &Temp1[0], 16);
+  SDValue BitEq = DAG.getNode(ISD::XOR, dl, MVT::v16i8, XOR, One);
+  SmallVector<SDValue, 16> Temp2(16, DAG.getConstant(1, MVT::i8));
+  SDValue Amt = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &Temp2[0], 16);
+  SDValue BitEqShl = DAG.getNode(ISD::ADD, dl, MVT::v16i8, BitEq, BitEq);
+  SDValue BitEqTmp1 = DAG.getNode(ISD::AND, dl, MVT::v16i8, BitEq, BitEqShl);
+  SmallVector<SDValue, 16> Temp3(16, DAG.getConstant(0xAAU, MVT::i8));
+  SDValue Mask = DAG.getNode(ISD::BUILD_VECTOR, dl, MVT::v16i8, &Temp3[0], 16);
+  SDValue BitEqTmp2 = DAG.getNode(ISD::AND, dl, MVT::v16i8, BitEqTmp1, Mask);
+  SDValue BitEqTmp3 = DAG.getNode(ISD::SRL, dl, MVT::v16i8, BitEqTmp2, Amt);
+  SDValue BitEqTmp4 = DAG.getNode(ISD::ADD, dl, MVT::v16i8, BitEqTmp2, BitEqTmp3);
+  SDValue Result = DAG.getNode(ISD::BITCAST, dl, MVT::v64i2, BitEqTmp4);
+  return Result;
+}
+
+static SDValue Lowerv64i2GT(SDValue Op, const X86Subtarget *Subtarget,
+                           SelectionDAG &DAG){
+  SDValue Op0 = Op.getOperand(0);
+  SDValue Op1 = Op.getOperand(1);
+  SDLoc dl(Op);
+  SDValue Op0Cast = DAG.getNode(ISD::BITCAST, dl, MVT::v16i8, Op0);
+  SDValue Op1Cast = DAG.getNode(ISD::BITCAST, dl, MVT::v16i8, Op1);
+
+  SDValue BitNeq = DAG.getNode(ISD::XOR, dl, MVT::v16i8, Op0Cast, Op1Cast);
+  SDValue BitEq = DAG.getNode(ISD::XOR, dl, MVT::v16i8, BitNeq, DAG.getConstant(0xFFU, MVT::v16i8));
+
+  SDValue Op1Flip = DAG.getNode(ISD::XOR, dl, MVT::v16i8, Op1Cast, DAG.getConstant(0xFFU, MVT::v16i8));
+  SDValue BitGt = DAG.getNode(ISD::AND, dl, MVT::v16i8, Op0Cast, Op1Flip);
+  SDValue BitGtShl = DAG.getNode(ISD::SHL, dl, MVT::v16i8, BitGt, DAG.getConstant(1U, MVT::v16i8));
+
+  SDValue BitEqTmp1 = DAG.getNode(ISD::AND, dl, MVT::v16i8, BitEq, BitGtShl);
+  SDValue BitEqTmp2 = DAG.getNode(ISD::OR, dl, MVT::v16i8, BitEqTmp1, BitGt);
+
+  SDValue BitEqTmp3 = DAG.getNode(ISD::AND, dl, MVT::v16i8, BitEqTmp2, DAG.getConstant(0xAAU, MVT::v16i8));
+  SDValue BitEqTmp4 = DAG.getNode(ISD::SRL, dl, MVT::v16i8, BitEqTmp3, DAG.getConstant(1U, MVT::v16i8));
+  SDValue BitEqTmp5 = DAG.getNode(ISD::ADD, dl, MVT::v16i8, BitEqTmp3, BitEqTmp4);
+  SDValue Result = DAG.getNode(ISD::BITCAST, dl, MVT::v64i2, BitEqTmp5);
+
+  return Result;
+}
+
 static SDValue LowerVSETCC(SDValue Op, const X86Subtarget *Subtarget,
                            SelectionDAG &DAG) {
   SDValue Op0 = Op.getOperand(0);
@@ -9903,6 +9953,13 @@ static SDValue LowerVSETCC(SDValue Op, const X86Subtarget *Subtarget,
   ISD::CondCode SetCCOpcode = cast<CondCodeSDNode>(CC)->get();
   bool isFP = Op.getOperand(1).getSimpleValueType().isFloatingPoint();
   SDLoc dl(Op);
+  if(Op0.getValueType().getSimpleVT() == MVT::v64i2)
+  {
+    if(SetCCOpcode == ISD::SETEQ)
+      return Lowerv64i2EQ(Op, Subtarget, DAG);
+    else if(SetCCOpcode == ISD::SETGT)
+      return Lowerv64i2GT(Op, Subtarget, DAG);
+  }
 
   if (isFP) {
 #ifndef NDEBUG
@@ -9948,7 +10005,7 @@ static SDValue LowerVSETCC(SDValue Op, const X86Subtarget *Subtarget,
     if (Op1.getValueType().is512BitVector() ||
         (MaskResult && OpVT.getVectorElementType().getSizeInBits() >= 32))
       return LowerIntVSETCC_AVX512(Op, DAG);
-
+    
     // In AVX-512 architecture setcc returns mask with i1 elements,
     // But there is no compare instruction for i8 and i16 elements.
     // We are not talking about 512-bit operands in this case, these
