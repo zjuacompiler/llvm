@@ -75,6 +75,9 @@ std::string llvm::getEnumName(MVT::SimpleValueType T) {
   case MVT::v16i1:    return "MVT::v16i1";
   case MVT::v32i1:    return "MVT::v32i1";
   case MVT::v64i1:    return "MVT::v64i1";
+  case MVT::v128i1:    return "MVT::v128i1";
+  case MVT::v64i2:    return "MVT::v64i2";
+  case MVT::v32i4:    return "MVT::v32i4";
   case MVT::v1i8:     return "MVT::v1i8";
   case MVT::v2i8:     return "MVT::v2i8";
   case MVT::v4i8:     return "MVT::v4i8";
@@ -98,6 +101,7 @@ std::string llvm::getEnumName(MVT::SimpleValueType T) {
   case MVT::v4i64:    return "MVT::v4i64";
   case MVT::v8i64:    return "MVT::v8i64";
   case MVT::v16i64:   return "MVT::v16i64";
+  case MVT::v1i128:   return "MVT::v1i128";
   case MVT::v2f16:    return "MVT::v2f16";
   case MVT::v4f16:    return "MVT::v4f16";
   case MVT::v8f16:    return "MVT::v8f16";

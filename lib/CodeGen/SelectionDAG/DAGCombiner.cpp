@@ -5703,7 +5703,7 @@ SDValue DAGCombiner::visitBITCAST(SDNode *N) {
     EVT DestEltVT = N->getValueType(0).getVectorElementType();
     assert(!DestEltVT.isVector() &&
            "Element type of vector ValueType must not be vector!");
-    if (isSimple)
+    if (isSimple && N->getValueType(0) != MVT::v64i2)
       return ConstantFoldBITCASTofBUILD_VECTOR(N0.getNode(), DestEltVT);
   }
 
